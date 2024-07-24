@@ -1,14 +1,33 @@
 import logging
-from typing import Literal, Optional, Tuple
+from dataclasses import dataclass
+from typing import Literal, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from transformers import PreTrainedModel
+from transformers.utils import ModelOutput
 
 from .configuration_isnet import ISNetConfig
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ISNetStageOutput(ModelOutput):
+    d1: torch.Tensor
+    d2: Optional[torch.Tensor] = None
+    d3: Optional[torch.Tensor] = None
+    d4: Optional[torch.Tensor] = None
+    d5: Optional[torch.Tensor] = None
+    d6: Optional[torch.Tensor] = None
+
+
+@dataclass
+class ISNetModelOutput(ModelOutput):
+    activated: ISNetStageOutput
+    hidden_states: Optional[ISNetStageOutput] = None
+
 
 bce_loss = nn.BCELoss(size_average=True)
 
@@ -540,7 +559,7 @@ class ISNetGTEncoder(nn.Module):
         return activated, hidden_states
 
 
-class ISNet(PreTrainedModel):
+class ISNetModel(PreTrainedModel):
     config_class = ISNetConfig
 
     def __init__(self, config: ISNetConfig) -> None:
@@ -582,7 +601,7 @@ class ISNet(PreTrainedModel):
 
         # self.outconv = nn.Conv2d(6*out_ch,out_ch,1)
 
-    def compute_loss_kl(self, preds, targets, dfs, fs, mode="MSE"):
+    def compute_loss_kl(self, preds, targets, dfs, fs, mode: LossMode = "MSE"):
         # return muti_loss_fusion(preds,targets)
         return muti_loss_fusion_kl(preds, targets, dfs, fs, mode=mode)
 
@@ -591,25 +610,8 @@ class ISNet(PreTrainedModel):
         return muti_loss_fusion(preds, targets)
 
     def forward(
-        self, pixel_values: torch.Tensor
-    ) -> Tuple[
-        Tuple[
-            torch.Tensor,
-            torch.Tensor,
-            torch.Tensor,
-            torch.Tensor,
-            torch.Tensor,
-            torch.Tensor,
-        ],
-        Tuple[
-            torch.Tensor,
-            torch.Tensor,
-            torch.Tensor,
-            torch.Tensor,
-            torch.Tensor,
-            torch.Tensor,
-        ],
-    ]:
+        self, pixel_values: torch.Tensor, return_dict: Optional[bool] = None
+    ) -> Union[Tuple, ISNetModelOutput]:
         x = pixel_values
         hx = x
 
@@ -692,17 +694,24 @@ class ISNet(PreTrainedModel):
             hx5d,
             hx6,
         )
-        return activated, hidden_states
+
+        if not return_dict:
+            return activated, hidden_states
+
+        return ISNetModelOutput(
+            activated=ISNetStageOutput(*activated),
+            hidden_states=ISNetStageOutput(*hidden_states),
+        )
 
 
 def convert_from_checkpoint(
     repo_id: str, filename: str, config: Optional[ISNetConfig] = None
-) -> ISNet:
+) -> ISNetModel:
     from huggingface_hub import hf_hub_download
 
     checkpoint_path = hf_hub_download(repo_id=repo_id, filename=filename)
     config = config or ISNetConfig()
-    model = ISNet(config)
+    model = ISNetModel(config)
 
     logger.info(f"Loading checkpoint from {checkpoint_path}")
     state_dict = torch.load(checkpoint_path)

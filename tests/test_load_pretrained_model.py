@@ -1,4 +1,4 @@
-from isnet import ISNet, convert_from_checkpoint
+from isnet import ISNetModel, convert_from_checkpoint
 
 
 def test_load_pretrained_model(repo_id: str, checkpoint_filename: str):
@@ -6,5 +6,5 @@ def test_load_pretrained_model(repo_id: str, checkpoint_filename: str):
         repo_id=repo_id,
         filename=checkpoint_filename,
     )
-    assert isinstance(model, ISNet)
+    assert isinstance(model, ISNetModel)
     assert model.training is False
