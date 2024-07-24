@@ -1,3 +1,73 @@
+# ISNet, 🤗 Transformers-ready ver.
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/creative-graphic-design/ISNet/blob/main/demo/ISNet_test.ipynb)
+
+```python
+#
+# Get appropriate device
+#
+import torch
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+#
+# Load the model and the processor
+#
+from transformers import AutoImageProcessor, AutoModel
+
+repo_id = "creative-graphic-design/ISNet-general-use"
+
+processor = AutoImageProcessor.from_pretrained(
+    repo_id,
+    trust_remote_code=True,
+)
+model = AutoModel.from_pretrained(
+    repo_id,
+    trust_remote_code=True,
+)
+
+#
+# Download an image
+#
+import requests
+from PIL import Image
+
+image = Image.open(
+    requests.get(
+        "https://raw.githubusercontent.com/xuebinqin/BASNet/master/test_data/test_images/0003.jpg",
+        stream=True,
+    ).raw
+)
+
+#
+# Preprocess the image
+#
+width, height = image.size
+inputs = processor(images=image)
+
+#
+# Move the model and the inputs to the appropriate device
+#
+model = model.to(device)
+inputs = {k: v.to(device) for k, v in inputs.items()}
+
+#
+# Run the model
+#
+with torch.no_grad():
+    outputs = model(**inputs)
+prediction = outputs[0][0]
+assert list(prediction.shape) == [1, 1, 1024, 1024]
+
+#
+# Postprocess the prediction
+#
+image = processor.postprocess(prediction, width=width, height=height)
+image  # Now you can visualize the output image
+```
+
+---
+
 <p align="center">
   <img width="420" height="320" src="figures/dis-logo-official.png">
 </p>
