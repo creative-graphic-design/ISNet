@@ -9,7 +9,6 @@ readme = "README.md"
 python = "^3.10"
 transformers = { version = ">=4.0.0", extras = ["torch"] }
 torch = ">=1.0.0"
-torchvision = ">=0.2.1"
 
 [tool.poetry.group.dev.dependencies]
 ruff = ">=0.1.5"

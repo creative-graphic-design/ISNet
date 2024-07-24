@@ -1,7 +1,14 @@
+import logging
+from typing import Literal, Optional, Tuple
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision import models
+from transformers import PreTrainedModel
+
+from .configuration_isnet import ISNetConfig
+
+logger = logging.getLogger(__name__)
 
 bce_loss = nn.BCELoss(size_average=True)
 
@@ -30,8 +37,12 @@ kl_loss = nn.KLDivLoss(size_average=True)
 l1_loss = nn.L1Loss(size_average=True)
 smooth_l1_loss = nn.SmoothL1Loss(size_average=True)
 
+LossMode = Literal["MSE", "KL", "MAE", "SmoothL1"]
 
-def muti_loss_fusion_kl(preds, target, dfs, fs, mode="MSE"):
+
+def muti_loss_fusion_kl(
+    preds, target, dfs, fs, mode: LossMode = "MSE"
+) -> Tuple[torch.Tensor, torch.Tensor]:
     loss0 = 0.0
     loss = 0.0
 
@@ -84,17 +95,15 @@ class REBNCONV(nn.Module):
         return xout
 
 
-## upsample tensor 'src' to have the same spatial size with tensor 'tar'
-def _upsample_like(src, tar):
-    src = F.upsample(src, size=tar.shape[2:], mode="bilinear")
-
-    return src
+def _upsample_like(src, tar: torch.Tensor) -> torch.Tensor:
+    """upsample tensor 'src' to have the same spatial size with tensor 'tar'"""
+    return F.upsample(src, size=tar.shape[2:], mode="bilinear")
 
 
 ### RSU-7 ###
 class RSU7(nn.Module):
-    def __init__(self, in_ch=3, mid_ch=12, out_ch=3, img_size=512):
-        super(RSU7, self).__init__()
+    def __init__(self, in_ch=3, mid_ch=12, out_ch=3, img_size=512) -> None:
+        super().__init__()
 
         self.in_ch = in_ch
         self.mid_ch = mid_ch
@@ -128,8 +137,8 @@ class RSU7(nn.Module):
         self.rebnconv2d = REBNCONV(mid_ch * 2, mid_ch, dirate=1)
         self.rebnconv1d = REBNCONV(mid_ch * 2, out_ch, dirate=1)
 
-    def forward(self, x):
-        b, c, h, w = x.shape
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # b, c, h, w = x.shape
 
         hx = x
         hxin = self.rebnconvin(hx)
@@ -175,8 +184,8 @@ class RSU7(nn.Module):
 
 ### RSU-6 ###
 class RSU6(nn.Module):
-    def __init__(self, in_ch=3, mid_ch=12, out_ch=3):
-        super(RSU6, self).__init__()
+    def __init__(self, in_ch=3, mid_ch=12, out_ch=3) -> None:
+        super().__init__()
 
         self.rebnconvin = REBNCONV(in_ch, out_ch, dirate=1)
 
@@ -202,7 +211,7 @@ class RSU6(nn.Module):
         self.rebnconv2d = REBNCONV(mid_ch * 2, mid_ch, dirate=1)
         self.rebnconv1d = REBNCONV(mid_ch * 2, out_ch, dirate=1)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         hx = x
 
         hxin = self.rebnconvin(hx)
@@ -242,8 +251,8 @@ class RSU6(nn.Module):
 
 ### RSU-5 ###
 class RSU5(nn.Module):
-    def __init__(self, in_ch=3, mid_ch=12, out_ch=3):
-        super(RSU5, self).__init__()
+    def __init__(self, in_ch=3, mid_ch=12, out_ch=3) -> None:
+        super().__init__()
 
         self.rebnconvin = REBNCONV(in_ch, out_ch, dirate=1)
 
@@ -265,7 +274,7 @@ class RSU5(nn.Module):
         self.rebnconv2d = REBNCONV(mid_ch * 2, mid_ch, dirate=1)
         self.rebnconv1d = REBNCONV(mid_ch * 2, out_ch, dirate=1)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         hx = x
 
         hxin = self.rebnconvin(hx)
@@ -299,7 +308,7 @@ class RSU5(nn.Module):
 
 ### RSU-4 ###
 class RSU4(nn.Module):
-    def __init__(self, in_ch=3, mid_ch=12, out_ch=3):
+    def __init__(self, in_ch=3, mid_ch=12, out_ch=3) -> None:
         super(RSU4, self).__init__()
 
         self.rebnconvin = REBNCONV(in_ch, out_ch, dirate=1)
@@ -318,7 +327,7 @@ class RSU4(nn.Module):
         self.rebnconv2d = REBNCONV(mid_ch * 2, mid_ch, dirate=1)
         self.rebnconv1d = REBNCONV(mid_ch * 2, out_ch, dirate=1)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         hx = x
 
         hxin = self.rebnconvin(hx)
@@ -346,8 +355,8 @@ class RSU4(nn.Module):
 
 ### RSU-4F ###
 class RSU4F(nn.Module):
-    def __init__(self, in_ch=3, mid_ch=12, out_ch=3):
-        super(RSU4F, self).__init__()
+    def __init__(self, in_ch=3, mid_ch=12, out_ch=3) -> None:
+        super().__init__()
 
         self.rebnconvin = REBNCONV(in_ch, out_ch, dirate=1)
 
@@ -361,7 +370,7 @@ class RSU4F(nn.Module):
         self.rebnconv2d = REBNCONV(mid_ch * 2, mid_ch, dirate=2)
         self.rebnconv1d = REBNCONV(mid_ch * 2, out_ch, dirate=1)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         hx = x
 
         hxin = self.rebnconvin(hx)
@@ -389,8 +398,8 @@ class myrebnconv(nn.Module):
         padding=1,
         dilation=1,
         groups=1,
-    ):
-        super(myrebnconv, self).__init__()
+    ) -> None:
+        super().__init__()
 
         self.conv = nn.Conv2d(
             in_ch,
@@ -404,12 +413,12 @@ class myrebnconv(nn.Module):
         self.bn = nn.BatchNorm2d(out_ch)
         self.rl = nn.ReLU(inplace=True)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.rl(self.bn(self.conv(x)))
 
 
 class ISNetGTEncoder(nn.Module):
-    def __init__(self, in_ch=1, out_ch=1):
+    def __init__(self, in_ch=1, out_ch=1) -> None:
         super(ISNetGTEncoder, self).__init__()
 
         self.conv_in = myrebnconv(
@@ -443,7 +452,26 @@ class ISNetGTEncoder(nn.Module):
     def compute_loss(self, preds, targets):
         return muti_loss_fusion(preds, targets)
 
-    def forward(self, x):
+    def forward(
+        self, x: torch.Tensor
+    ) -> Tuple[
+        Tuple[
+            torch.Tensor,
+            torch.Tensor,
+            torch.Tensor,
+            torch.Tensor,
+            torch.Tensor,
+            torch.Tensor,
+        ],
+        Tuple[
+            torch.Tensor,
+            torch.Tensor,
+            torch.Tensor,
+            torch.Tensor,
+            torch.Tensor,
+            torch.Tensor,
+        ],
+    ]:
         hx = x
 
         hxin = self.conv_in(hx)
@@ -493,21 +521,32 @@ class ISNetGTEncoder(nn.Module):
 
         # d0 = self.outconv(torch.cat((d1,d2,d3,d4,d5,d6),1))
 
-        return [
+        activated = (
             F.sigmoid(d1),
             F.sigmoid(d2),
             F.sigmoid(d3),
             F.sigmoid(d4),
             F.sigmoid(d5),
             F.sigmoid(d6),
-        ], [hx1, hx2, hx3, hx4, hx5, hx6]
+        )
+        hidden_states = (
+            hx1,
+            hx2,
+            hx3,
+            hx4,
+            hx5,
+            hx6,
+        )
+        return activated, hidden_states
 
 
-class ISNetDIS(nn.Module):
-    def __init__(self, in_ch=3, out_ch=1):
-        super(ISNetDIS, self).__init__()
+class ISNet(PreTrainedModel):
+    config_class = ISNetConfig
 
-        self.conv_in = nn.Conv2d(in_ch, 64, 3, stride=2, padding=1)
+    def __init__(self, config: ISNetConfig) -> None:
+        super().__init__(config)
+
+        self.conv_in = nn.Conv2d(config.in_channels, 64, 3, stride=2, padding=1)
         self.pool_in = nn.MaxPool2d(2, stride=2, ceil_mode=True)
 
         self.stage1 = RSU7(64, 32, 64)
@@ -534,12 +573,12 @@ class ISNetDIS(nn.Module):
         self.stage2d = RSU6(256, 32, 64)
         self.stage1d = RSU7(128, 16, 64)
 
-        self.side1 = nn.Conv2d(64, out_ch, 3, padding=1)
-        self.side2 = nn.Conv2d(64, out_ch, 3, padding=1)
-        self.side3 = nn.Conv2d(128, out_ch, 3, padding=1)
-        self.side4 = nn.Conv2d(256, out_ch, 3, padding=1)
-        self.side5 = nn.Conv2d(512, out_ch, 3, padding=1)
-        self.side6 = nn.Conv2d(512, out_ch, 3, padding=1)
+        self.side1 = nn.Conv2d(64, config.out_channels, 3, padding=1)
+        self.side2 = nn.Conv2d(64, config.out_channels, 3, padding=1)
+        self.side3 = nn.Conv2d(128, config.out_channels, 3, padding=1)
+        self.side4 = nn.Conv2d(256, config.out_channels, 3, padding=1)
+        self.side5 = nn.Conv2d(512, config.out_channels, 3, padding=1)
+        self.side6 = nn.Conv2d(512, config.out_channels, 3, padding=1)
 
         # self.outconv = nn.Conv2d(6*out_ch,out_ch,1)
 
@@ -551,7 +590,27 @@ class ISNetDIS(nn.Module):
         # return muti_loss_fusion(preds,targets)
         return muti_loss_fusion(preds, targets)
 
-    def forward(self, x):
+    def forward(
+        self, pixel_values: torch.Tensor
+    ) -> Tuple[
+        Tuple[
+            torch.Tensor,
+            torch.Tensor,
+            torch.Tensor,
+            torch.Tensor,
+            torch.Tensor,
+            torch.Tensor,
+        ],
+        Tuple[
+            torch.Tensor,
+            torch.Tensor,
+            torch.Tensor,
+            torch.Tensor,
+            torch.Tensor,
+            torch.Tensor,
+        ],
+    ]:
+        x = pixel_values
         hx = x
 
         hxin = self.conv_in(hx)
@@ -617,11 +676,38 @@ class ISNetDIS(nn.Module):
 
         # d0 = self.outconv(torch.cat((d1,d2,d3,d4,d5,d6),1))
 
-        return [
+        activated = (
             F.sigmoid(d1),
             F.sigmoid(d2),
             F.sigmoid(d3),
             F.sigmoid(d4),
             F.sigmoid(d5),
             F.sigmoid(d6),
-        ], [hx1d, hx2d, hx3d, hx4d, hx5d, hx6]
+        )
+        hidden_states = (
+            hx1d,
+            hx2d,
+            hx3d,
+            hx4d,
+            hx5d,
+            hx6,
+        )
+        return activated, hidden_states
+
+
+def convert_from_checkpoint(
+    repo_id: str, filename: str, config: Optional[ISNetConfig] = None
+) -> ISNet:
+    from huggingface_hub import hf_hub_download
+
+    checkpoint_path = hf_hub_download(repo_id=repo_id, filename=filename)
+    config = config or ISNetConfig()
+    model = ISNet(config)
+
+    logger.info(f"Loading checkpoint from {checkpoint_path}")
+    state_dict = torch.load(checkpoint_path)
+
+    model.load_state_dict(state_dict, strict=True)
+    model.eval()
+
+    return model
