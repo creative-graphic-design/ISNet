@@ -15,7 +15,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 #
 from transformers import AutoImageProcessor, AutoModel
 
-repo_id = "creative-graphic-design/ISNet"
+repo_id = "creative-graphic-design/ISNet-general-use"
 
 processor = AutoImageProcessor.from_pretrained(
     repo_id,
